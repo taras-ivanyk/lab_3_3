@@ -16,6 +16,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'activities',
+    'lab33',
 ]
 
 MIDDLEWARE = [
@@ -86,3 +87,8 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ]
 }
+
+
+LOGIN_REDIRECT_URL = '/ui/comments/'
+
+LOGOUT_REDIRECT_URL = '/ui/comments/'

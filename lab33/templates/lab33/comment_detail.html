@@ -1,0 +1,15 @@
+<h2>Деталі коментаря #{{ comment.id }}</h2>
+<p><strong>Автор:</strong> {{ comment.user.username }}</p>
+<p><strong>Активність:</strong> {{ comment.activity.name }}</p>
+<p><strong>Текст:</strong></p>
+<blockquote>{{ comment.body }}</blockquote>
+<p><strong>Створено:</strong> {{ comment.created_at }}</p>
+
+<hr>
+<a href="{% url 'lab33:comment_update' comment.pk %}">Редагувати</a> |
+<a href="{% url 'lab33:comment_list' %}">Назад до списку</a>
+
+<form action="{% url 'lab33:comment_delete' comment.pk %}" method="post" style="display:inline;">
+    {% csrf_token %}
+    <button type="submit" onclick="return confirm('Точно видалити?');">Видалити цей коментар</button>
+</form>

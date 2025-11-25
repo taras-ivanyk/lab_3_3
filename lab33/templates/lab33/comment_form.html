@@ -1,0 +1,7 @@
+<h2>{{ action }} Comment</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Зберегти</button>
+</form>
+<a href="{% url 'lab33:comment_list' %}">Скасувати</a>

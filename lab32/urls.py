@@ -4,9 +4,9 @@ from django.urls import path, include
 urlpatterns = [
     path("admin/", admin.site.urls),
 
-    # Підключаємо 'activities/urls.py'
     path("api/", include("activities.urls")),
 
-    # Підключаємо URL-и для кнопки "Log in" у DRF
     path('api-auth/', include('rest_framework.urls')),
+    path('ui/', include('lab33.urls')),
+    path('accounts/', include('django.contrib.auth.urls')),
 ]
