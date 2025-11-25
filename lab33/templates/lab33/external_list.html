@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Клієнти банку (API Друга)</title>
+</head>
+<body>
+    <h1>Список Клієнтів (Server 8001)</h1>
+    <p><a href="{% url 'lab33:comment_list' %}">← Назад</a></p>
+
+    <table border="1" cellpadding="5" cellspacing="0">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Повне ім'я (Full Name)</th>
+                <th>Email</th>
+                <th>Телефон</th>
+                <th>Дії</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in activities %} <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.full_name }}</td>
+                <td>{{ item.email }}</td>
+                <td>{{ item.phone }}</td>
+                <td>
+                    <form action="{% url 'lab33:external_delete' item.id %}" method="post">
+                        {% csrf_token %}
+                        <button type="submit" onclick="return confirm('Видалити клієнта?');" style="color: red;">
+                            Видалити (API)
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align:center;">
+                    Немає даних. Перевір, чи запущено сервер друга на порту 8001 <br>
+                    і чи створені там клієнти (http://127.0.0.1:8001/admin/).
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
