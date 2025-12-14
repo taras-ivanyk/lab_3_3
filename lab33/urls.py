@@ -4,7 +4,6 @@ from . import views
 app_name = 'lab33'
 
 urlpatterns = [
-    # Локальні шаблони (CRUD Comment)
     path('comments/', views.comment_list, name='comment_list'),
     path('comments/<int:pk>/', views.comment_detail, name='comment_detail'),
     path('comments/create/', views.comment_create, name='comment_create'),
