@@ -9,7 +9,6 @@ from .models import (
     UserMonthlyStats
 )
 
-# Реєструємо всі ваші моделі, щоб ви бачили їх в /admin/
 admin.site.register(Activity)
 admin.site.register(Profile)
 admin.site.register(Comment)

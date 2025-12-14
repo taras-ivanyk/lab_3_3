@@ -19,8 +19,109 @@ from .repositories import DataAccessLayer
 from django.db import IntegrityError
 from django.http import Http404
 
+import pandas as pd
+from rest_framework.decorators import action
 
-# --- БАЗОВИЙ КЛАС, ЯКИЙ ВИКОНУЄ УМОВУ 3 ---
+class AnalyticsViewSet(viewsets.ViewSet):
+
+    permission_classes = [AllowAny]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.db = DataAccessLayer()
+
+    def _process_pandas_response(self, queryset, fields, stats_columns=None, group_by_col=None):
+
+        if fields:
+            data = list(queryset.values(*fields))
+        else:
+            data = list(queryset)
+
+        df = pd.DataFrame(data)
+
+        if df.empty:
+            return Response({"message": "No data available", "statistics": {}})
+
+        stats = {}
+        if stats_columns:
+            for col in stats_columns:
+                if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+                    stats[col] = {
+                        "mean": df[col].mean(),
+                        "median": df[col].median(),
+                        "min": df[col].min(),
+                        "max": df[col].max(),
+                        "std_dev": df[col].std()
+                    }
+
+        grouped_data = None
+        if group_by_col and group_by_col in df.columns and stats_columns:
+            grouped_df = df.groupby(group_by_col)[stats_columns].mean()
+            grouped_data = grouped_df.to_dict()
+
+        response_data = {
+            "dataset": df.to_dict(orient="records"),
+            "statistics": stats,
+            "grouped_analysis": grouped_data
+        }
+        return Response(response_data)
+
+    @action(detail=False, methods=['get'])
+    def leaderboard(self, request):
+        qs = self.db.analytics.get_top_distance_users()
+        return self._process_pandas_response(
+            qs,
+            fields=['username', 'total_distance'],
+            stats_columns=['total_distance']
+        )
+
+    @action(detail=False, methods=['get'])
+    def social_engagement(self, request):
+        qs = self.db.analytics.get_social_activities()
+        return self._process_pandas_response(
+            qs,
+            fields=['id', 'user__username', 'comments_count', 'kudos_count', 'engagement_score'],
+            stats_columns=['engagement_score', 'comments_count', 'kudos_count']
+        )
+
+    @action(detail=False, methods=['get'])
+    def monthly_trends(self, request):
+        qs = self.db.analytics.get_monthly_activity_stats()
+        return self._process_pandas_response(
+            qs,
+            fields=None,
+            stats_columns=['total_distance', 'avg_duration']
+        )
+
+    @action(detail=False, methods=['get'])
+    def influencers(self, request):
+        qs = self.db.analytics.get_influential_users()
+        return self._process_pandas_response(
+            qs,
+            fields=['username', 'followers_count'],
+            stats_columns=['followers_count']
+        )
+
+    @action(detail=False, methods=['get'])
+    def activity_performance(self, request):
+        qs = self.db.analytics.get_activity_type_performance()
+        return self._process_pandas_response(
+            qs,
+            fields=None,
+            stats_columns=['avg_distance', 'max_elevation']
+        )
+
+    @action(detail=False, methods=['get'])
+    def user_levels(self, request):
+        qs = self.db.analytics.get_user_activity_levels()
+        return self._process_pandas_response(
+            qs,
+            fields=None,
+            stats_columns=['activities_count'],
+            group_by_col='status'
+        )
+
+
 class RepositoryViewSet(viewsets.ModelViewSet):
     """
     Кастомний ViewSet, який змушує DRF використовувати наш DataAccessLayer
@@ -29,12 +130,9 @@ class RepositoryViewSet(viewsets.ModelViewSet):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Умова 3: Доступ до даних через репозиторій [cite: repositories.py]
         self.db = DataAccessLayer()
-        # Встановлюємо 'repo' на основі 'queryset.model.__name__'
         model_name = self.queryset.model._meta.model_name.lower()
 
-        # Спеціальні випадки для 'user' та 'activitypoint'
         if model_name == 'user':
             self.repo = self.db.users
         elif model_name == 'profile':
@@ -76,20 +174,17 @@ class RepositoryViewSet(viewsets.ModelViewSet):
         self.repo.delete(id=instance.pk)
 
 
-# --- CRUD ДЛЯ USER ---
 class UserViewSet(RepositoryViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
     def get_permissions(self):
-        # Дозволити будь-кому 'create' (реєстрація),
-        # але вимагати логін для 'list', 'retrieve' і т.д.
+
         if self.action == 'create':
             return [AllowAny()]
         return [IsAuthenticated()]
 
 
-# --- CRUD ДЛЯ PROFILE ---
 class ProfileViewSet(RepositoryViewSet):
     queryset = Profile.objects.all()
     serializer_class = ProfileSerializer
@@ -97,7 +192,6 @@ class ProfileViewSet(RepositoryViewSet):
 
     def perform_create(self, serializer):
         try:
-            # Передаємо 'user' у репозиторій
             serializer.save(repository=self.repo, user=self.request.user)
         except IntegrityError:
             return Response(
@@ -106,28 +200,24 @@ class ProfileViewSet(RepositoryViewSet):
             )
 
     def get_object(self):
-        # Профіль прив'язаний до User ID (pk)
         obj = self.repo.get_by_id(self.kwargs["pk"])
         if not obj:
             raise Http404
         self.check_object_permissions(self.request, obj)
         return obj
 
-    # 💡 Додаємо логіку безпеки для 'update'
     def perform_update(self, serializer):
         profile = self.get_object()
         if profile.user != self.request.user:
             return Response({"error": "You can only edit your own profile."}, status=status.HTTP_403_FORBIDDEN)
         serializer.save(repository=self.repo, model_id=self.kwargs["pk"])
 
-    # 💡 Додаємо логіку безпеки для 'destroy'
     def perform_destroy(self, instance):
         if instance.user != self.request.user:
             return Response({"error": "You can only delete your own profile."}, status=status.HTTP_403_FORBIDDEN)
         self.repo.delete(id=instance.pk)
 
 
-# --- CRUD ДЛЯ ACTIVITY ---
 class ActivityViewSet(RepositoryViewSet):
     queryset = Activity.objects.all()
     serializer_class = ActivitySerializer
@@ -137,7 +227,6 @@ class ActivityViewSet(RepositoryViewSet):
         serializer.save(repository=self.repo, user=self.request.user)
 
 
-# --- CRUD ДЛЯ COMMENT ---
 class CommentViewSet(RepositoryViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
@@ -147,7 +236,6 @@ class CommentViewSet(RepositoryViewSet):
         serializer.save(repository=self.repo, user=self.request.user)
 
 
-# --- CRUD ДЛЯ KUDOS ---
 class KudosViewSet(RepositoryViewSet):
     queryset = Kudos.objects.all()
     serializer_class = KudosSerializer
@@ -163,7 +251,6 @@ class KudosViewSet(RepositoryViewSet):
             )
 
 
-# --- CRUD ДЛЯ ACTIVITYPOINT ---
 class ActivityPointViewSet(RepositoryViewSet):
     queryset = ActivityPoint.objects.all()
     serializer_class = ActivityPointSerializer
@@ -177,7 +264,6 @@ class ActivityPointViewSet(RepositoryViewSet):
         serializer.save(repository=self.repo)
 
 
-# --- CRUD ДЛЯ FOLLOWER ---
 class FollowerViewSet(RepositoryViewSet):
     queryset = Follower.objects.all()
     serializer_class = FollowerSerializer
@@ -197,7 +283,6 @@ class FollowerViewSet(RepositoryViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-    # 💡 Кастомний 'destroy' для композитного ключа
     def perform_destroy(self, instance):
         # 'instance' - це об'єкт Follower
         if instance.follower != self.request.user:
@@ -208,7 +293,6 @@ class FollowerViewSet(RepositoryViewSet):
         self.repo.delete(follower_id=instance.follower.id, followee_id=instance.followee.id)
 
 
-# --- READ-ONLY ДЛЯ USERMONTHLYSTATS ---
 class UserMonthlyStatsViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = UserMonthlyStats.objects.all()
     serializer_class = UserMonthlyStatsSerializer
@@ -217,7 +301,6 @@ class UserMonthlyStatsViewSet(viewsets.ReadOnlyModelViewSet):
     # і не потребує кастомних 'create', 'update'
 
 
-# --- Агрегований Звіт (Умова 2) ---
 class GlobalStatsReport(viewsets.ViewSet):
     """
     Окремий ViewSet (не ModelViewSet) для звіту.

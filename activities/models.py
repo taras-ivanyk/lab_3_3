@@ -6,7 +6,6 @@ from django.db.models import F
 
 
 class Profile(models.Model):
-    # Gender choices constraint
     GENDER_CHOICES = [
         ('male', 'Male'),
         ('female', 'Female'),
@@ -21,7 +20,7 @@ class Profile(models.Model):
         max_length=50,
         blank=True,
         null=True,
-        choices=GENDER_CHOICES  # Додано обмеження вибору
+        choices=GENDER_CHOICES
     )
 
     weight_kg = models.FloatField(
@@ -54,7 +53,6 @@ class Profile(models.Model):
                 check=models.Q(age__gte=0),
                 name='profile_age_positive'
             ),
-            # Додано обмеження для gender на рівні БД
             models.CheckConstraint(
                 check=models.Q(gender__in=['male', 'female', 'other']) | models.Q(gender__isnull=True),
                 name='profile_gender_valid_choice'
@@ -66,7 +64,6 @@ class Profile(models.Model):
 
 
 class Activity(models.Model):
-    # Activity type choices
     ACTIVITY_TYPES = [
         ('running', 'Running'),
         ('cycling', 'Cycling'),
@@ -81,7 +78,6 @@ class Activity(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="activities")
 
-    # Додано поле activity_type з обмеженням вибору
     activity_type = models.CharField(
         max_length=50,
         choices=ACTIVITY_TYPES,
@@ -104,7 +100,6 @@ class Activity(models.Model):
     start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
 
-    # created_at ВИДАЛЕНО згідно з вимогою
 
     def clean(self):
         if self.start_time and self.end_time:

@@ -7,6 +7,5 @@ urlpatterns = [
     path("api/", include("activities.urls")),
 
     path('api-auth/', include('rest_framework.urls')),
-    path('ui/', include('lab33.urls')),
     path('accounts/', include('django.contrib.auth.urls')),
 ]
